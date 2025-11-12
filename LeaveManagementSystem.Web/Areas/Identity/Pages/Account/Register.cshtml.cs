@@ -10,6 +10,7 @@ using System.Text;
 using System.Text.Encodings.Web;
 using System.Threading;
 using System.Threading.Tasks;
+using LeaveManagementSystem.Web.Services.LeaveAllocations;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
@@ -26,6 +27,7 @@ public class RegisterModel : PageModel
 {
     private readonly SignInManager<ApplicationUser> _signInManager;
     private readonly RoleManager<IdentityRole> _roleManager;
+    private readonly ILeaveAllocationService _leaveAllocationService;
     private readonly UserManager<ApplicationUser> _userManager;
     private readonly IUserStore<ApplicationUser> _userStore;
     private readonly IUserEmailStore<ApplicationUser> _emailStore;
@@ -33,6 +35,7 @@ public class RegisterModel : PageModel
     private readonly IEmailSender _emailSender;
 
     public RegisterModel(
+        ILeaveAllocationService leaveAllocationService,
         UserManager<ApplicationUser> userManager,
         IUserStore<ApplicationUser> userStore,
         SignInManager<ApplicationUser> signInManager,
@@ -40,6 +43,7 @@ public class RegisterModel : PageModel
         ILogger<RegisterModel> logger,
         IEmailSender emailSender)
     {
+        this._leaveAllocationService = leaveAllocationService;
         _userManager = userManager;
         _userStore = userStore;
         _emailStore = GetEmailStore();
@@ -157,15 +161,16 @@ public class RegisterModel : PageModel
             {
                 _logger.LogInformation("User created a new account with password.");
 
-                if (Input.RoleName=="Supervisor")
+                if (Input.RoleName==Roles.Supervisor)
                 {
-                    await _userManager.AddToRolesAsync(user, ["Employee", "Supervisor"]);
+                    await _userManager.AddToRolesAsync(user, [Roles.Employee, Roles.Supervisor]);
                 }
                 else
                 {
-                    await _userManager.AddToRoleAsync(user, "Employee");
+                    await _userManager.AddToRoleAsync(user, Roles.Employee);
                 }
                 var userId = await _userManager.GetUserIdAsync(user);
+                await _leaveAllocationService.AllocateLeave(userId);
                 var code = await _userManager.GenerateEmailConfirmationTokenAsync(user);
                 code = WebEncoders.Base64UrlEncode(Encoding.UTF8.GetBytes(code));
                 var callbackUrl = Url.Page(
